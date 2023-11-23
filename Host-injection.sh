@@ -17,10 +17,10 @@ display_summary() {
     fi
 }
 
-# Function to enforce https if 443 is used
+# Function to enforce https if 443 or 8443 is used
 enforce_https() {
     local port=$1
-    if [ "$port" -eq 443 ]; then
+    if [ "$port" -eq 443 ] || [ "$port" -eq 8443 ]; then
         protocol="https"
     else
         protocol="http"
@@ -30,13 +30,15 @@ enforce_https() {
 
 # Check if the user has provided the required arguments
 if [ "$#" -lt 2 ]; then
-    print_message 1 "Usage: $0 [-f <target_file> | <target_url>] -p <ports>"
     print_message 1 "nvz"
+    print_message 1 "Usage: $0 [-f <target_file> | -d <target_domain>] -p <ports>"
+    print_message 1 "Usage: $0 -f targets.txt -p '80 443 8080 8443'"
+    print_message 1 "Usage: $0 -d example.com -p '80 443 8080 8443'"
     exit 1
 fi
 
 # Parse command line options
-while getopts ":f:p:" opt; do
+while getopts ":f:p:d:" opt; do
     case $opt in
         f)
             target_file="$OPTARG"
@@ -48,6 +50,9 @@ while getopts ":f:p:" opt; do
             ;;
         p)
             ports=($OPTARG)
+            ;;
+        d)
+            target_domain="$OPTARG"
             ;;
         \?)
             print_message 1 "Invalid option: -$OPTARG"
@@ -61,8 +66,11 @@ while getopts ":f:p:" opt; do
 done
 
 # If target file is not provided, use the positional argument as target URL
-if [ -z "$target_file" ]; then
-    targets=("$1")
+if [ -z "$target_file" ] && [ -z "$target_domain" ]; then
+    print_message 1 "Error: Target not specified. Use -f option for target file or -d option for target domain."
+    exit 1
+elif [ -z "$target_file" ]; then
+    targets=("$target_domain")
 fi
 
 # Check if ports are provided
@@ -89,7 +97,7 @@ for target in "${targets[@]}"; do
     for port in "${ports[@]}"; do
         protocol=$(enforce_https "$port")
 
-        # Create a list of paths to check
+        # Create a list of paths to check for redirection 302,301 and sometimes it would be vuln at 200 
         paths=("/index.php" "/icons/small" "/user_guide" "/" "/phpmyadmin")  
 
         for path in "${paths[@]}"; do
